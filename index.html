@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="rw">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Random Result Checker - WIN/LOSS</title>
+<style>
+body{
+    font-family: Arial, sans-serif;
+    background:#eef2f5;
+    display:flex;
+    justify-content:center;
+    align-items:flex-start;
+    padding:50px 10px 20px 10px;
+    min-height:100vh;
+    margin:0;
+}
+.container{
+    background:#fff;
+    padding:25px;
+    width:100%;
+    max-width:450px;
+    border-radius:10px;
+    box-shadow:0 0 15px rgba(0,0,0,0.1);
+    position:relative;
+}
+h3,h4{text-align:center;}
+input,button{
+    width:100%;
+    padding:12px;
+    margin-top:10px;
+    font-size:16px;
+    border-radius:5px;
+    box-sizing:border-box;
+    border:1px solid #ccc;
+}
+input::placeholder{ color:#888; }
+button{
+    background:#28a745;
+    color:#fff;
+    border:none;
+    cursor:pointer;
+    transition: background 0.3s, transform 0.2s;
+}
+button:hover{
+    background:#218838;
+    transform: scale(1.05);
+}
+.reset-btn{
+    background:#dc3545;
+}
+.reset-btn:hover{
+    background:#c82333;
+    transform: scale(1.05);
+}
+.result{
+    margin-top:15px;
+    font-weight:bold;
+    text-align:center;
+    font-size:28px;
+    opacity:0;
+    transition: opacity 0.5s ease, transform 0.5s ease;
+}
+.result.show{
+    opacity:1;
+    transform: translateY(0);
+}
+.result.hide{
+    opacity:0;
+    transform: translateY(-10px);
+}
+.notice{
+    margin-top:15px;
+    font-size:14px;
+    color:#333;
+    text-align:center;
+}
+ul{
+    list-style-type:none;
+    padding-left:0;
+    max-height:250px;
+    overflow-y:auto;
+}
+li{
+    background:#f4f4f4;
+    margin-bottom:5px;
+    padding:5px 10px;
+    border-radius:4px;
+    font-size:14px;
+}
+.win{color:green;font-weight:bold;}
+.loss{color:red;font-weight:bold;}
+
+/* Confetti canvas */
+#confetti-canvas{
+    position:absolute;
+    top:0;
+    left:0;
+    width:100%;
+    height:100%;
+    pointer-events:none;
+}
+</style>
+</head>
+<body>
+
+<div class="container">
+    <canvas id="confetti-canvas"></canvas>
+    <h3>Shyiramo Umubare (Integer)</h3>
+    <input type="number" id="num" placeholder="Shyiramo umubare (ex: 100)">
+    <button onclick="check()">Reba Ibisubizo</button>
+    <button class="reset-btn" onclick="deleteHistory()">Siba Amateka (Admin)</button>
+    <div class="result" id="res"></div>
+    <div class="notice">Twandikire kuri 0792522881 uhabwe umubare</div>
+
+    <h4>Amateka y'Ibisubizo</h4>
+    <ul id="historyList"></ul>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.5.1/dist/confetti.browser.min.js"></script>
+<script>
+// === Data ===
+const allNumbers = [
+100,101,102,103,104,105,106,107,108,109,
+200,201,202,203,204,205,206,207,208,209,
+300,301,302,303,304,305,306,307,308,309,
+400,401,402,403,404,405,406,407,408,409,
+500,501,502,503,504,505,506,507,508,509
+];
+const baseResults = [0,1,2,3]; // 0=loss, >0=win
+
+// Mapping
+let mapping = JSON.parse(localStorage.getItem('mapping')) || {};
+if(Object.keys(mapping).length===0){
+    allNumbers.forEach(n=>{
+        mapping[n] = baseResults[Math.floor(Math.random()*baseResults.length)];
+    });
+    localStorage.setItem('mapping',JSON.stringify(mapping));
+}
+
+// History & used numbers
+let usedNumbers = JSON.parse(localStorage.getItem('usedNumbers')) || [];
+let history = JSON.parse(localStorage.getItem('history')) || [];
+let availableNumbers = allNumbers.filter(n=>!usedNumbers.includes(n));
+
+// Format date
+function formatDateTime(date){
+    const h=String(date.getHours()).padStart(2,'0');
+    const m=String(date.getMinutes()).padStart(2,'0');
+    const s=String(date.getSeconds()).padStart(2,'0');
+    const d=String(date.getDate()).padStart(2,'0');
+    const mo=String(date.getMonth()+1).padStart(2,'0');
+    const y=date.getFullYear();
+    return `${h}:${m}:${s} ${d}/${mo}/${y}`;
+}
+
+// Render history
+function renderHistory(){
+    const historyList=document.getElementById('historyList');
+    historyList.innerHTML='';
+    history.slice().reverse().forEach(h=>{
+        const status=h.result>0?`✅ WIN ${h.result} FRW`:`❌ LOSS ${h.result} FRW`;
+        const li=document.createElement('li');
+        li.innerHTML=`${h.date} - Umubare: ${h.number}, <span class="${h.result>0?'win':'loss'}">${status}</span>`;
+        historyList.appendChild(li);
+    });
+}
+
+// Confetti function
+function shootConfetti(){
+    const duration = 2 * 1000;
+    const end = Date.now() + duration;
+    (function frame(){
+        confetti({
+            particleCount: 5,
+            angle: 60,
+            spread: 55,
+            origin: { x: 0 }
+        });
+        confetti({
+            particleCount: 5,
+            angle: 120,
+            spread: 55,
+            origin: { x: 1 }
+        });
+        if(Date.now() < end){ requestAnimationFrame(frame); }
+    }());
+}
+
+// Check function
+function check(){
+    const input=parseInt(document.getElementById("num").value);
+    const res=document.getElementById("res");
+    res.classList.remove("show"); res.classList.add("hide");
+
+    setTimeout(()=>{
+        if(isNaN(input)){
+            res.style.color="red"; res.textContent="Shyiramo umubare wemewe (Integer)";
+        } else if(usedNumbers.includes(input)){
+            res.style.color="red"; res.textContent="Uyu mubare wakoreshwe mbere kandi ntuzongera gukoreshwa";
+        } else if(availableNumbers.includes(input)){
+            const result=mapping[input];
+            res.innerHTML = result>0?`✅ WIN ${result} FRW`:`❌ LOSS ${result} FRW`;
+            res.style.color=result>0?"green":"red";
+
+            if(result>0){ shootConfetti(); } // trigger confetti on win
+
+            usedNumbers.push(input);
+            localStorage.setItem('usedNumbers',JSON.stringify(usedNumbers));
+
+            const now=new Date();
+            history.push({number:input,result:result,date:formatDateTime(now)});
+            localStorage.setItem('history',JSON.stringify(history));
+
+            availableNumbers = availableNumbers.filter(n=>n!==input);
+            renderHistory();
+        } else{
+            res.style.color="red"; res.textContent="Uyu mubare nturi mu rutonde";
+        }
+        res.classList.remove("hide"); res.classList.add("show");
+    },50);
+}
+
+// Delete history admin
+function deleteHistory(){
+    const adminCode=prompt("Shyiramo kode yemewe kugira ngo usibe amateka:");
+    if(adminCode==="20201"){
+        history=[]; usedNumbers=[];
+        localStorage.removeItem('history');
+        localStorage.removeItem('usedNumbers');
+        document.getElementById('res').textContent="Amateka yasibwe!";
+        renderHistory();
+    } else alert("Kode siyo, ntushobora gusiba amateka!");
+}
+
+// Initial render
+renderHistory();
+</script>
+</body>
+</html>
